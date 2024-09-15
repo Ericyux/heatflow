@@ -1,0 +1,5 @@
+pip install -U neuraloperator
+pip install matplotlib
+pip install torch_harmonics
+pip install wandb
+pip install scikit-learn

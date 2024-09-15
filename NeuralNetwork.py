@@ -131,5 +131,5 @@ plt.tight_layout()
 plt.show()
 
 # Save the model
-torch.save(model.state_dict(), 'modified_heat_flow_nn_model.pth')
-print("Model saved as 'modified_heat_flow_nn_model.pth'")
+torch.save(model.state_dict(), 'heat_flow_nn_model.pth')
+print("Model saved as 'heat_flow_nn_model.pth'")

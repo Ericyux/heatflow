@@ -123,5 +123,5 @@ plt.tight_layout()
 plt.show()
 
 # Save the model
-torch.save(model.state_dict(), 'heat_flow_neural_operator_model_optimized.pth')
-print("Model saved as 'heat_flow_neural_operator_model_optimized.pth'")
+torch.save(model.state_dict(), 'heat_flow_neural_operator_model.pth')
+print("Model saved as 'heat_flow_neural_operator_model.pth'")
