@@ -18,7 +18,7 @@ print(f"Loaded data shape: {data.shape}")
 
 # Prepare the data
 # We'll use a subset of the time steps to reduce memory usage
-time_step_interval = 3  
+time_step_interval = 2  # Use every 2nd time step
 X = data[:, ::time_step_interval, :]  # Subset of timesteps as input
 y = data[:, 1::time_step_interval, :]  # Subset of timesteps as target, shifted by one
 X = X[:, np.newaxis, :, :]
@@ -37,11 +37,12 @@ y_train = torch.from_numpy(y_train).to(device)
 X_test = torch.from_numpy(X_test).to(device)
 y_test = torch.from_numpy(y_test).to(device)
 
-# Create DataLoader 
-batch_size = 16
+# Create DataLoader with a smaller batch size
+batch_size = 8
 train_dataset = TensorDataset(X_train, y_train)
 train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
 
+# Define the TFNO model 
 model = TFNO(
     n_modes=(16, 16),
     hidden_channels=32, 
@@ -49,7 +50,7 @@ model = TFNO(
     out_channels=1,
     factorization='tucker',
     n_layers=4,  
-    domain_padding=(0.1, 0.1)  
+    domain_padding=(0.1, 0.1) 
 ).to(device)
 
 # Define loss function and optimizer
@@ -57,7 +58,7 @@ criterion = LpLoss(d=3, p=2)
 optimizer = optim.Adam(model.parameters(), lr=0.001)
 
 # Training loop
-num_epochs = 2  
+num_epochs = 100
 train_losses = []
 test_losses = []
 
@@ -75,6 +76,7 @@ for epoch in range(num_epochs):
     # Evaluate on train and test set
     model.eval()
     with torch.no_grad():
+        # Use smaller batches for evaluation to avoid OOM
         train_loss = sum(criterion(model(X_train[i:i+batch_size]), y_train[i:i+batch_size]).item() 
                          for i in range(0, len(X_train), batch_size)) / (len(X_train) / batch_size)
         test_loss = sum(criterion(model(X_test[i:i+batch_size]), y_test[i:i+batch_size]).item() 
