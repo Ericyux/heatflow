@@ -57,6 +57,7 @@ def generate_2d_heat_flow_data(num_points, num_timesteps, diffusivity, dt, dx):
     alpha = diffusivity
     CFL = alpha * dt / (dx**2)
     # Ensure the CFL condition is met for stability
+    print(CFL)
     if CFL > 0.25:
         raise ValueError("The CFL condition is not satisfied. Reduce dt or increase dx.")
     
@@ -93,21 +94,21 @@ def generate_multiple_samples(num_samples, num_points, num_timesteps, diffusivit
     return data
 
 # Set parameters
-num_samples = 1000  # Reduced from 10000 to 1000 due to increased data size
-num_points = 64  # Reduced from 100 to 64 to keep data size manageable
+num_samples = 10000
+num_points = 100  
 num_timesteps = 100  # Reduced from 1000 to 100        
 diffusivity = 0.1
-dt = 0.01
-dx = 1.0 / (num_points - 1)
+dt = 0.0005
+dx = 1.5 / (num_points - 1)
 
 # Generate multiple samples
 data = generate_multiple_samples(num_samples, num_points, num_timesteps, diffusivity, dt, dx)
 
 # Save the data
-np.save('heat_flow_data_2d_1000_samples.npy', data)
+np.save('heat_flow_data_2d_10000_samples.npy', data)
 
 print(f"Data shape: {data.shape}")
-print("Data saved as 'heat_flow_data_2d_1000_samples.npy'")
+print("Data saved as 'heat_flow_data_2d_10000_samples.npy'")
 
 # Plot a few random samples
 num_plots = 3

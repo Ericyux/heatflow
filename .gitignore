@@ -5,3 +5,5 @@
 heat_flow_data_10000_samples.npy
 heat_flow_neural_operator_model.pth
 heat_flow_nn_model.pth
+heat_flow_data_2d_1000_samples.npy
+heat_flow_data_2d_10000_samples.npy

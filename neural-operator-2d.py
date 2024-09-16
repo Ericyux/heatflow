@@ -12,7 +12,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Using device: {device}")
 
 # Load the data
-data = np.load('heat_flow_data_2d_1000_samples.npy')
+data = np.load('heat_flow_data_2d_10000_samples.npy')
 print(f"Loaded data shape: {data.shape}")
 
 # Prepare the data
