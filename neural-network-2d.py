@@ -44,22 +44,34 @@ class ImprovedHeatFlowNN2D(nn.Module):
         self.conv1 = nn.Conv3d(input_channels, hidden_channels, kernel_size=3, padding=1)
         self.conv2 = nn.Conv3d(hidden_channels, hidden_channels, kernel_size=3, padding=1)
         self.conv3 = nn.Conv3d(hidden_channels, hidden_channels, kernel_size=3, padding=1)
-        self.conv4 = nn.Conv3d(hidden_channels, output_channels, kernel_size=3, padding=1)
+        self.conv4 = nn.Conv3d(hidden_channels, hidden_channels, kernel_size=3, padding=1)
+        self.conv5 = nn.Conv3d(hidden_channels, hidden_channels, kernel_size=3, padding=1)
+        self.conv6 = nn.Conv3d(hidden_channels, hidden_channels, kernel_size=3, padding=1)
+        self.conv7 = nn.Conv3d(hidden_channels, hidden_channels, kernel_size=3, padding=1)
+        self.conv8 = nn.Conv3d(hidden_channels, output_channels, kernel_size=3, padding=1)
         self.bn1 = nn.BatchNorm3d(hidden_channels)
         self.bn2 = nn.BatchNorm3d(hidden_channels)
         self.bn3 = nn.BatchNorm3d(hidden_channels)
+        self.bn4 = nn.BatchNorm3d(hidden_channels)
+        self.bn5 = nn.BatchNorm3d(hidden_channels)
+        self.bn6 = nn.BatchNorm3d(hidden_channels)
+        self.bn7 = nn.BatchNorm3d(hidden_channels)
         self.relu = nn.ReLU()
     
     def forward(self, x):
         x = self.relu(self.bn1(self.conv1(x)))
         x = self.relu(self.bn2(self.conv2(x)))
         x = self.relu(self.bn3(self.conv3(x)))
-        x = self.conv4(x)
+        x = self.relu(self.bn4(self.conv4(x)))
+        x = self.relu(self.bn5(self.conv5(x)))
+        x = self.relu(self.bn6(self.conv6(x)))
+        x = self.relu(self.bn7(self.conv7(x)))
+        x = self.conv8(x)
         return x
 
 input_channels = 1
 output_channels = 1
-hidden_channels = 64
+hidden_channels = 80
 model = ImprovedHeatFlowNN2D(input_channels, output_channels, hidden_channels).to(device)
 
 criterion = LpLoss(d=4, p=2)
@@ -104,7 +116,7 @@ plt.legend()
 plt.title('Learning Curves - Neural Network')
 plt.show()
 
-torch.save(model.state_dict(), 'improved_heat_flow_nn_model_2d.pth')
-print("Model saved as 'improved_heat_flow_nn_model_2d.pth'")
+torch.save(model.state_dict(), 'heat_flow_nn_model_2d.pth')
+print("Model saved as 'heat_flow_nn_model_2d.pth'")
 
 print(f"Final Test Loss (Neural Network): {test_losses[-1]:.4f}")
