@@ -7,6 +7,7 @@ from sklearn.model_selection import train_test_split
 import matplotlib.pyplot as plt
 from neuralop.models import TFNO
 from neuralop import LpLoss
+import os
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Using device: {device}")
@@ -54,9 +55,12 @@ criterion = LpLoss(d=4, p=2)
 optimizer = optim.Adam(model.parameters(), lr=0.001, weight_decay=1e-5)
 scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=5, factor=0.5, verbose=True)
 
-num_epochs = 100
+num_epochs = 50 
 train_losses = []
 test_losses = []
+
+# Create a directory for checkpoints
+os.makedirs('checkpoints', exist_ok=True)
 
 for epoch in range(num_epochs):
     model.train()
@@ -80,8 +84,20 @@ for epoch in range(num_epochs):
     
     scheduler.step(test_loss)
     
+    # Display loss for every epoch
+    print(f'Epoch [{epoch+1}/{num_epochs}], Train Loss: {train_loss:.4f}, Test Loss: {test_loss:.4f}')
+    
+    # Save checkpoint every 10 epochs
     if (epoch + 1) % 10 == 0:
-        print(f'Epoch [{epoch+1}/{num_epochs}], Train Loss: {train_loss:.4f}, Test Loss: {test_loss:.4f}')
+        checkpoint_path = f'checkpoints/neural_operator_checkpoint_epoch_{epoch+1}.pth'
+        torch.save({
+            'epoch': epoch,
+            'model_state_dict': model.state_dict(),
+            'optimizer_state_dict': optimizer.state_dict(),
+            'train_loss': train_loss,
+            'test_loss': test_loss,
+        }, checkpoint_path)
+        print(f"Checkpoint saved: {checkpoint_path}")
 
 plt.figure(figsize=(10, 5))
 plt.plot(train_losses, label='Train Loss')
@@ -92,7 +108,7 @@ plt.legend()
 plt.title('Learning Curves - Neural Operator')
 plt.show()
 
-torch.save(model.state_dict(), 'optimized_heat_flow_neural_operator_model_2d.pth')
-print("Model saved as 'optimized_heat_flow_neural_operator_model_2d.pth'")
+torch.save(model.state_dict(), 'heat_flow_neural_operator_model_2d.pth')
+print("Model saved as ' heat_flow_neural_operator_model_2d.pth'")
 
 print(f"Final Test Loss (Neural Operator): {test_losses[-1]:.4f}")
