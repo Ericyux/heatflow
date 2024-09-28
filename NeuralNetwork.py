@@ -35,9 +35,9 @@ train_dataset = TensorDataset(X_train, y_train)
 train_loader = DataLoader(train_dataset, batch_size=16, shuffle=True)
 
 # Define the modified neural network
-class ModifiedHeatFlowNN(nn.Module):
+class HeatFlowNN(nn.Module):
     def __init__(self, input_channels, output_channels, hidden_channels):
-        super(ModifiedHeatFlowNN, self).__init__()
+        super(HeatFlowNN, self).__init__()
         self.conv1 = nn.Conv2d(input_channels, hidden_channels, kernel_size=3, padding=1)
         self.conv2 = nn.Conv2d(hidden_channels, hidden_channels, kernel_size=3, padding=1)
         self.conv3 = nn.Conv2d(hidden_channels, hidden_channels, kernel_size=3, padding=1)
@@ -55,7 +55,7 @@ class ModifiedHeatFlowNN(nn.Module):
 input_channels = 1
 output_channels = 1
 hidden_channels = 32
-model = ModifiedHeatFlowNN(input_channels, output_channels, hidden_channels).to(device)
+model = HeatFlowNN(input_channels, output_channels, hidden_channels).to(device)
 
 # Use Xavier initialization for weights
 def init_weights(m):

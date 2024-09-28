@@ -1,6 +1,9 @@
 # Ignore virtual environment
 .venv/
 
+# Ignore checkpoints directory
+checkpoints/
+
 # Ignore specific files
 heat_flow_data_10000_samples.npy
 heat_flow_neural_operator_model.pth

@@ -57,7 +57,6 @@ def generate_2d_heat_flow_data(num_points, num_timesteps, diffusivity, dt, dx):
     alpha = diffusivity
     CFL = alpha * dt / (dx**2)
     # Ensure the CFL condition is met for stability
-    print(CFL)
     if CFL > 0.25:
         raise ValueError("The CFL condition is not satisfied. Reduce dt or increase dx.")
     
@@ -93,51 +92,55 @@ def generate_multiple_samples(num_samples, num_points, num_timesteps, diffusivit
     
     return data
 
-# Set parameters
-num_samples = 10000
-num_points = 100  
-num_timesteps = 100  # Reduced from 1000 to 100        
-diffusivity = 0.1
-dt = 0.0005
-dx = 1.5 / (num_points - 1)
+def main():
+    # Set parameters
+    num_samples = 10000
+    num_points = 100  
+    num_timesteps = 100  # Reduced from 1000 to 100        
+    diffusivity = 0.1
+    dt = 0.0005
+    dx = 1.5 / (num_points - 1)
 
-# Generate multiple samples
-data = generate_multiple_samples(num_samples, num_points, num_timesteps, diffusivity, dt, dx)
+    # Generate multiple samples
+    data = generate_multiple_samples(num_samples, num_points, num_timesteps, diffusivity, dt, dx)
 
-# Save the data
-np.save('heat_flow_data_2d_10000_samples.npy', data)
+    # Save the data
+    np.save('heat_flow_data_2d_10000_samples.npy', data)
 
-print(f"Data shape: {data.shape}")
-print("Data saved as 'heat_flow_data_2d_10000_samples.npy'")
+    print(f"Data shape: {data.shape}")
+    print("Data saved as 'heat_flow_data_2d_10000_samples.npy'")
 
-# Plot a few random samples
-num_plots = 3
-fig, axs = plt.subplots(num_plots, 3, figsize=(15, 5*num_plots))
-fig.suptitle('Sample 2D Heat Flow Simulations')
+    # Plot a few random samples
+    num_plots = 3
+    fig, axs = plt.subplots(num_plots, 3, figsize=(15, 5*num_plots))
+    fig.suptitle('Sample 2D Heat Flow Simulations')
 
-for i in range(num_plots):
-    sample_idx = np.random.randint(0, num_samples)
-    
-    # Plot initial condition
-    im = axs[i, 0].imshow(data[sample_idx, 0], cmap='hot', extent=[0, 1, 0, 1], vmin=0, vmax=1)
-    axs[i, 0].set_title(f'Sample {sample_idx} - Initial Condition')
-    axs[i, 0].set_xlabel('X')
-    axs[i, 0].set_ylabel('Y')
-    plt.colorbar(im, ax=axs[i, 0])
-    
-    # Plot middle state
-    im = axs[i, 1].imshow(data[sample_idx, num_timesteps//2], cmap='hot', extent=[0, 1, 0, 1], vmin=0, vmax=1)
-    axs[i, 1].set_title(f'Sample {sample_idx} - Middle State')
-    axs[i, 1].set_xlabel('X')
-    axs[i, 1].set_ylabel('Y')
-    plt.colorbar(im, ax=axs[i, 1])
-    
-    # Plot final state
-    im = axs[i, 2].imshow(data[sample_idx, -1], cmap='hot', extent=[0, 1, 0, 1], vmin=0, vmax=1)
-    axs[i, 2].set_title(f'Sample {sample_idx} - Final State')
-    axs[i, 2].set_xlabel('X')
-    axs[i, 2].set_ylabel('Y')
-    plt.colorbar(im, ax=axs[i, 2])
+    for i in range(num_plots):
+        sample_idx = np.random.randint(0, num_samples)
+        
+        # Plot initial condition
+        im = axs[i, 0].imshow(data[sample_idx, 0], cmap='hot', extent=[0, 1, 0, 1], vmin=0, vmax=1)
+        axs[i, 0].set_title(f'Sample {sample_idx} - Initial Condition')
+        axs[i, 0].set_xlabel('X')
+        axs[i, 0].set_ylabel('Y')
+        plt.colorbar(im, ax=axs[i, 0])
+        
+        # Plot middle state
+        im = axs[i, 1].imshow(data[sample_idx, num_timesteps//2], cmap='hot', extent=[0, 1, 0, 1], vmin=0, vmax=1)
+        axs[i, 1].set_title(f'Sample {sample_idx} - Middle State')
+        axs[i, 1].set_xlabel('X')
+        axs[i, 1].set_ylabel('Y')
+        plt.colorbar(im, ax=axs[i, 1])
+        
+        # Plot final state
+        im = axs[i, 2].imshow(data[sample_idx, -1], cmap='hot', extent=[0, 1, 0, 1], vmin=0, vmax=1)
+        axs[i, 2].set_title(f'Sample {sample_idx} - Final State')
+        axs[i, 2].set_xlabel('X')
+        axs[i, 2].set_ylabel('Y')
+        plt.colorbar(im, ax=axs[i, 2])
 
-plt.tight_layout()
-plt.show()
+    plt.tight_layout()
+    plt.show()
+
+if __name__ == "__main__":
+    main()
