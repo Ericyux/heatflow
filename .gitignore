@@ -1,12 +1,17 @@
-# Ignore virtual environment
+# Virtual environment
 .venv/
 
-# Ignore checkpoints directory
-checkpoints/
+# Python cache
+__pycache__/
+*.pyc
 
-# Ignore specific files
-heat_flow_data_10000_samples.npy
-heat_flow_neural_operator_model.pth
-heat_flow_nn_model.pth
-heat_flow_data_2d_1000_samples.npy
-heat_flow_data_2d_10000_samples.npy
+# Generated datasets (large; regenerate with src.generate commands in README)
+data/
+*.npy
+*.npz
+!results/*_fields.npz
+
+# Model checkpoints
+checkpoints/
+*.pt
+*.pth

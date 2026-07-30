@@ -1,5 +1,7 @@
-pip install -U neuraloperator
-pip install matplotlib
-pip install torch_harmonics
-pip install wandb
-pip install scikit-learn
+# Install PyTorch with CUDA support first (pick the index for your CUDA version):
+#   pip install torch --index-url https://download.pytorch.org/whl/cu128
+# then: pip install -r requirements.txt
+torch>=2.4
+numpy
+matplotlib
+tqdm
