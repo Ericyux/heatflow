@@ -33,14 +33,26 @@ def _save(fig, name):
 
 
 def fig_rollout(results, pde):
+    """Median rollout curve per model, with every individual seed drawn as a
+    thin line. Seed curves beat a mean +/- std band here: rollout-final
+    distributions are skewed (occasional diverging seeds), so a symmetric
+    band on a log axis misleads.
+    """
     fig, ax = plt.subplots(figsize=(6, 4))
     for name, entry in results["models"].items():
-        curve = entry["rollout_rel_l2"]
-        steps = np.arange(1, len(curve) + 1)
-        ax.semilogy(steps, curve, marker="o", markersize=3, **STYLE[name])
+        per_seed = np.array(entry.get("rollout_rel_l2_per_seed",
+                                      [entry["rollout_rel_l2"]]))
+        steps = np.arange(1, per_seed.shape[1] + 1)
+        for seed_curve in per_seed:
+            ax.semilogy(steps, seed_curve, color=STYLE[name]["color"],
+                        alpha=0.35, linewidth=0.9)
+        ax.semilogy(steps, np.median(per_seed, axis=0), marker="o",
+                    markersize=3, **STYLE[name])
     ax.set_xlabel("autoregressive step")
     ax.set_ylabel("relative L2 error")
-    ax.set_title(f"Rollout stability — {PDE_TITLE[pde]}")
+    n_seeds = max(e.get("n_seeds", 1) for e in results["models"].values())
+    ax.set_title(f"Rollout stability — {PDE_TITLE[pde]} "
+                 f"(median of {n_seeds} seeds; thin lines = seeds)")
     ax.grid(True, which="both", alpha=0.3)
     ax.legend()
     _save(fig, f"{pde}_rollout.png")
@@ -51,9 +63,12 @@ def fig_superres(results, pde):
     res_train = results["meta"]["res_train"]
     for name, entry in results["models"].items():
         table = entry["super_resolution"]
+        stds = entry.get("super_resolution_std", {})
         res = sorted(int(r) for r in table)
         errs = [table[str(r)] for r in res]
-        ax.semilogy(res, errs, marker="o", **STYLE[name])
+        yerr = [stds.get(str(r), 0.0) for r in res]
+        ax.errorbar(res, errs, yerr=yerr, marker="o", capsize=3, **STYLE[name])
+        ax.set_yscale("log")
     ax.axvline(res_train, color="k", linestyle=":", alpha=0.6)
     ax.text(res_train * 1.02, ax.get_ylim()[0] * 1.3, "training\nresolution",
             fontsize=8, va="bottom")
@@ -168,12 +183,17 @@ def fig_timing(results, pde):
 def fig_learning_curves(pde):
     fig, ax = plt.subplots(figsize=(6, 4))
     for name in ("fno", "unet", "cnn"):
-        hist_path = RESULTS_DIR / f"{pde}_{name}" / "history.json"
-        if not hist_path.exists():
-            continue
-        hist = json.loads(hist_path.read_text())
-        ax.semilogy(np.arange(1, len(hist["val_rel_l2"]) + 1), hist["val_rel_l2"],
-                    **STYLE[name])
+        run_dirs = sorted(RESULTS_DIR.glob(f"{pde}_{name}_s*"))
+        for i, run_dir in enumerate(run_dirs):
+            hist_path = run_dir / "history.json"
+            if not hist_path.exists():
+                continue
+            hist = json.loads(hist_path.read_text())
+            style = dict(STYLE[name])
+            if i > 0:
+                style.pop("label")  # one legend entry per model
+            ax.semilogy(np.arange(1, len(hist["val_rel_l2"]) + 1),
+                        hist["val_rel_l2"], alpha=0.6, linewidth=1.2, **style)
     ax.set_xlabel("epoch")
     ax.set_ylabel("validation one-step relative L2")
     ax.set_title(f"Learning curves — {PDE_TITLE[pde]}")

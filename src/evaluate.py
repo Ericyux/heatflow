@@ -27,14 +27,27 @@ RESULTS_DIR = Path("results")
 MODELS = ["fno", "unet", "cnn"]
 
 
-def load_predictor(pde, name, periodic, device):
-    out_dir = RESULTS_DIR / f"{pde}_{name}"
-    config = json.loads((out_dir / "config.json").read_text())
+def seed_dirs(pde, name):
+    """All run directories for a (pde, model) pair, ordered by seed."""
+    dirs = list(RESULTS_DIR.glob(f"{pde}_{name}_s*"))
+    return sorted(dirs, key=lambda p: int(p.name.rsplit("_s", 1)[1]))
+
+
+def load_predictor(run_dir, name, periodic, device):
+    config = json.loads((run_dir / "config.json").read_text())
     model = build_model(name, periodic=periodic)
-    model.load_state_dict(torch.load(out_dir / "best.pt", map_location=device))
+    model.load_state_dict(torch.load(run_dir / "best.pt", map_location=device))
     predictor = StepPredictor(model, config["norm_mean"], config["norm_std"],
                               periodic, device)
     return predictor, config
+
+
+def _mean_std(values):
+    """(mean, std) over the seed axis; std is 0 for a single seed."""
+    stacked = torch.stack([torch.as_tensor(v, dtype=torch.float64) for v in values])
+    mean = stacked.mean(dim=0)
+    std = stacked.std(dim=0) if len(values) > 1 else torch.zeros_like(mean)
+    return mean, std
 
 
 def _timeit(fn, reps, warmup, sync):
@@ -113,36 +126,58 @@ def main():
     results = {"pde": pde, "meta": meta, "models": {}}
     fields = {"truth": test_frames[0].numpy()}  # sample trajectory for figures
 
-    predictors = {}
+    predictors = {}  # seed-0 predictor per model (timing, spectra, figures)
     for name in MODELS:
-        predictor, config = load_predictor(pde, name, data.periodic, device)
-        predictors[name] = predictor
-        entry = {"n_params": config["n_params"]}
+        runs = seed_dirs(pde, name)
+        if not runs:
+            raise FileNotFoundError(f"no trained runs found for {pde}/{name}")
 
-        # --- one-step accuracy at training resolution
-        errs = one_step_errors(predictor, test_frames)
-        entry["one_step_rel_l2"] = errs.mean().item()
-        entry["one_step_rel_l2_std"] = errs.std().item()
+        one_step, curves, superres = [], [], []
+        n_params = None
+        for run_dir in runs:
+            predictor, config = load_predictor(run_dir, name, data.periodic, device)
+            n_params = config["n_params"]
+            if run_dir is runs[0]:
+                predictors[name] = predictor
+                # sample rollout fields for qualitative figures
+                sample = predictor.rollout(test_frames[:1, 0].to(device), horizon)
+                fields[name] = sample[0].cpu().numpy()
 
-        # --- autoregressive rollout stability
-        curve = rollout_errors(predictor, test_frames)
-        entry["rollout_rel_l2"] = curve.tolist()
-        entry["rollout_final_rel_l2"] = curve[-1].item()
+            one_step.append(one_step_errors(predictor, test_frames).mean().item())
+            curves.append(rollout_errors(predictor, test_frames))
+            sr = {str(res_train): one_step[-1]}
+            for res in data.super_resolutions():
+                sr[str(res)] = one_step_errors(predictor, data.frames("test", res)).mean().item()
+            superres.append(sr)
+            print(f"{pde}/{name}/{run_dir.name.rsplit('_', 1)[1]}: "
+                  f"one-step {one_step[-1]:.4f}, rollout final {curves[-1][-1]:.4f}")
 
-        # --- zero-shot super-resolution (trained at res_train only)
-        entry["super_resolution"] = {str(res_train): entry["one_step_rel_l2"]}
-        for res in data.super_resolutions():
-            errs_r = one_step_errors(predictor, data.frames("test", res))
-            entry["super_resolution"][str(res)] = errs_r.mean().item()
-
-        # --- sample rollout fields for qualitative figures
-        sample = predictor.rollout(test_frames[:1, 0].to(device), horizon)
-        fields[name] = sample[0].cpu().numpy()
+        os_mean, os_std = _mean_std(one_step)
+        curve_mean, curve_std = _mean_std(curves)
+        entry = {
+            "n_params": n_params,
+            "n_seeds": len(runs),
+            "one_step_rel_l2": os_mean.item(),
+            "one_step_rel_l2_std": os_std.item(),
+            "one_step_rel_l2_per_seed": one_step,
+            "rollout_rel_l2": curve_mean.tolist(),
+            "rollout_rel_l2_std": curve_std.tolist(),
+            "rollout_rel_l2_per_seed": [c.tolist() for c in curves],
+            "rollout_final_rel_l2": curve_mean[-1].item(),
+            "rollout_final_rel_l2_std": curve_std[-1].item(),
+            "super_resolution": {},
+            "super_resolution_std": {},
+        }
+        for res in superres[0]:
+            m, s = _mean_std([sr[res] for sr in superres])
+            entry["super_resolution"][res] = m.item()
+            entry["super_resolution_std"][res] = s.item()
 
         results["models"][name] = entry
-        print(f"{pde}/{name}: one-step {entry['one_step_rel_l2']:.4f}, "
-              f"rollout final {entry['rollout_final_rel_l2']:.4f}, "
-              f"super-res {entry['super_resolution']}")
+        print(f"{pde}/{name}: one-step {entry['one_step_rel_l2']:.4f} "
+              f"+/- {entry['one_step_rel_l2_std']:.4f} ({len(runs)} seeds), "
+              f"rollout final {entry['rollout_final_rel_l2']:.4f} "
+              f"+/- {entry['rollout_final_rel_l2_std']:.4f}")
 
     # --- enstrophy spectra at the final rollout step (NS only)
     if pde == "ns":

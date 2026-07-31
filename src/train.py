@@ -63,7 +63,7 @@ def train(args):
         optimizer, T_max=args.epochs * len(loader)
     )
 
-    out_dir = RESULTS_DIR / f"{pde}_{args.model}"
+    out_dir = RESULTS_DIR / f"{pde}_{args.model}_s{args.seed}"
     out_dir.mkdir(parents=True, exist_ok=True)
 
     history = {"train_loss": [], "val_rel_l2": [], "epoch_seconds": []}
