@@ -1,0 +1,14 @@
+{
+  "pde": "ns",
+  "model": "fno",
+  "pushforward": true,
+  "data": "data/ns.npz",
+  "n_params": 2368001,
+  "epochs": 40,
+  "batch_size": 32,
+  "lr": 0.001,
+  "seed": 2,
+  "norm_mean": 5.881031839294337e-08,
+  "norm_std": 0.8008480668067932,
+  "best_val_rel_l2": 0.0018001424614340067
+}

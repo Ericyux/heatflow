@@ -7,9 +7,11 @@ problems: the heat equation and incompressible **Navier-Stokes** in vorticity
 form. All models learn the one-step solution operator `u(t) → u(t + Δt)` and
 are evaluated on one-step accuracy, autoregressive rollout stability,
 **zero-shot super-resolution**, and wall-clock cost against the solver that
-generated the data. Every configuration is trained with **5 random seeds**;
-tables report mean ± std across seeds (rollouts: median and range, because
-their seed distribution is skewed — see the stability note below).
+generated the data. Every configuration is trained with **multiple random
+seeds** (15 for FNO on Navier-Stokes, 5 elsewhere); tables report mean ± std
+across seeds (rollouts: median and range, because their seed distribution is
+heavy-tailed — see the stability study below, including a **pushforward
+training** variant that mitigates it).
 
 **Headline results (Navier-Stokes, ν = 10⁻³, 5 seeds per model):**
 
@@ -24,15 +26,19 @@ their seed distribution is skewed — see the stability note below).
   tested at 256²), FNO degrades only to **1.00% ± 0.02** error while the
   U-Net and CNN collapse to 12–13%: convolution kernels are fixed in
   *pixels*, Fourier modes are fixed in *physical wavenumbers*.
-- After 30 autoregressive steps the median FNO error is 3.7% vs. 8.7% for
-  U-Net; the CNN diverges entirely (85%), shredding the flow into
+- After 30 autoregressive steps the median FNO error is 5.7% vs. 8.7% for
+  U-Net — but one-step-trained FNO rollouts are **heavy-tailed across seeds**
+  (4 of 15 end above 10%). Adding **pushforward training** cuts the median to
+  2.2% and the worst seed from 29% to 14% at no one-step or super-resolution
+  cost. The CNN diverges entirely (85%), shredding the flow into
   receptive-field-sized artifacts.
 
-| NS, 5 seeds | one-step rel. L2 ↓ | 30-step rollout, median [range] ↓ | zero-shot 256² ↓ | speedup vs. solver ↑ | params |
+| Navier-Stokes | one-step rel. L2 ↓ | 30-step rollout, median [range] ↓ | zero-shot 256² ↓ | speedup vs. solver ↑ | params |
 |---|---|---|---|---|---|
-| **FNO** | **0.0020 ± 0.0001** | **0.037** [0.016, 0.283] | **0.0100 ± 0.0002** | 187× | 2.37M |
-| U-Net | 0.0068 ± 0.0002 | 0.087 [0.082, 0.096] | 0.134 ± 0.008 | 169× | 2.44M |
-| CNN | 0.0229 ± 0.0006 | 0.855 [0.796, 0.905] | 0.123 ± 0.008 | 253×* | 2.35M |
+| **FNO** (15 seeds) | **0.0019 ± 0.0001** | 0.057 [0.016, 0.285] | **0.0102 ± 0.0002** | 187× | 2.37M |
+| **FNO + pushforward** (5 seeds) | 0.0022 ± 0.0002 | **0.022** [0.019, 0.144] | 0.0101 ± 0.0002 | 183× | 2.37M |
+| U-Net (5 seeds) | 0.0068 ± 0.0002 | 0.087 [0.082, 0.096] | 0.134 ± 0.008 | 164× | 2.44M |
+| CNN (5 seeds) | 0.0229 ± 0.0006 | 0.855 [0.796, 0.905] | 0.123 ± 0.008 | 390×* | 2.35M |
 
 \*fast but wrong — it has diverged by the end of the rollout.
 
@@ -54,19 +60,31 @@ but the CNN pumps spurious enstrophy into high wavenumbers (its sawtooth
 artifacts), while FNO stays closest to the truth until the dissipation range
 that lies below its retained modes.
 
-### Rollout stability is seed-sensitive — an honest finding
+### Rollout stability: a heavy tail, and a fix that mostly works
 
 One-step accuracy is extremely reproducible (std ≲ 5% of the mean for every
-model), but **long-horizon rollout stability is not**: across 5 FNO seeds the
-final-step NS error ranged from 1.6% to 28% (4 of 5 seeds ended below 6.1%).
-The U-Net, while 3.4× worse one-step, rolled out consistently (8.2–9.6%).
+model), but **long-horizon rollout stability is not**. Across 15 one-step-
+trained FNO seeds, final-step NS rollout error ranged from 1.6% to 28.5%,
+with 4 of 15 seeds ending above 10% — a heavy tail, not a rare fluke. The
+U-Net, while 3.4× worse one-step, rolled out consistently (8.2–9.6%).
 Autoregressive divergence depends on the *structure* of a model's error — a
-property one-step training neither measures nor controls. This is a known
-failure mode of one-step-trained surrogates; pushforward/rollout training and
-training-noise injection (Brandstetter et al., 2022; Stachenfeld et al.,
-2021) are the standard mitigations and the natural next step for this repo.
+property one-step training neither measures nor controls: during a rollout
+the model consumes its own outputs, a state distribution it never saw during
+training.
+
+**Pushforward training** (Brandstetter et al., 2022) targets exactly this
+mismatch: each training batch takes a second step from the model's own
+*detached* prediction, so the model learns to be robust to its own error
+distribution at the cost of one extra forward pass (`--pushforward`,
+~1.3× epoch time, no backprop through time). On 5 seeds it left one-step and
+super-resolution accuracy unchanged (0.0022 vs. 0.0019; 1.0% at 256²) while
+cutting the median rollout error from 5.7% to 2.2% and the worst seed from
+28.5% to 14.4%. It shrinks the tail rather than eliminating it — 1 of 5
+seeds still drifted — so longer unrolls or rollout-based checkpoint
+selection remain as future work (best checkpoints here are chosen by
+one-step validation error for all variants, which is part of the problem).
 The rollout figures draw every seed as a thin line rather than a symmetric
-±std band, since the seed distribution is skewed by these rare divergences.
+±std band, since these skewed distributions make mean ± std misleading.
 
 ## Heat equation results
 
@@ -106,7 +124,7 @@ convolutions, which is non-causal — the input contains the future — and
 structurally cannot be rolled out or evaluated across resolutions.)
 
 **Models** (all ~2.4M parameters, same training protocol — AdamW, cosine
-schedule, relative-L2 loss, batch 32, 5 seeds each, no per-model tuning):
+schedule, relative-L2 loss, batch 32, multiple seeds, no per-model tuning):
 
 - `FNO2d` — 4 spectral layers, 12 Fourier modes, width 32, implemented from
   scratch in [src/models.py](src/models.py) (~60 lines for the spectral
@@ -138,7 +156,7 @@ schedule, relative-L2 loss, batch 32, 5 seeds each, no per-model tuning):
 **Metrics**: relative L2 error ‖pred − true‖₂/‖true‖₂ (the standard metric of
 the neural-operator literature, so numbers are directly comparable to Li et
 al.), reported one-step over all test pairs and per-step along rollouts,
-aggregated over 5 training seeds per configuration.
+aggregated across training seeds (15 for NS/FNO, 5 per other configuration).
 
 **Timing protocol**: median wall-clock per full trajectory at batch size 1,
 same machine (RTX 4050 Laptop 6 GB / torch 2.11 cu128), `torch.cuda.synchronize`
@@ -167,6 +185,13 @@ for s in 0 1 2 3 4; do
     python -m src.train --data data/heat.npz --model $m --epochs 30 --seed $s
     python -m src.train --data data/ns.npz   --model $m --epochs 40 --seed $s
   done
+done
+# rollout-stability study: extra FNO seeds + pushforward variant (NS only)
+for s in 5 6 7 8 9 10 11 12 13 14; do
+  python -m src.train --data data/ns.npz --model fno --epochs 40 --seed $s
+done
+for s in 0 1 2 3 4; do
+  python -m src.train --data data/ns.npz --model fno --epochs 40 --seed $s --pushforward
 done
 
 # evaluate (aggregates every seed it finds) + figures
@@ -201,11 +226,12 @@ legacy/         original v1 scripts (3-D volume-to-volume TFNO vs. CNN, MSE)
 
 ## Known limitations
 
-- Rollout stability varies across seeds (see the stability note above): the
-  models are trained purely one-step, with best checkpoints selected by
-  one-step validation error. Pushforward/rollout-aware training is the
-  established fix and would likely tighten the FNO rollout range
-  substantially.
+- Rollout stability has a heavy seed tail (see the stability study above).
+  The 2-step pushforward variant cuts the tail substantially but does not
+  eliminate it; longer training unrolls and rollout-based checkpoint
+  selection (best checkpoints here are chosen by one-step validation error)
+  are the obvious next steps. The failure-rate estimates are coarse: 4/15
+  and 1/5 divergent seeds carry wide binomial confidence intervals.
 - The Navier-Stokes regime (ν = 10⁻³, smooth forcing) is mildly turbulent,
   not a hard-turbulence benchmark; ν = 10⁻⁴ at longer horizons would need
   more data and training than a 6 GB laptop GPU comfortably provides.
