@@ -162,7 +162,12 @@ def count_params(model):
 
 
 def build_model(name, periodic=True, **overrides):
-    """Model factory. `periodic` controls FNO domain padding only."""
+    """Model factory. `periodic` controls FNO domain padding only.
+
+    Training-scheme variants share their base architecture: 'fnopf'
+    (pushforward-trained FNO) builds the same network as 'fno'.
+    """
+    name = {"fnopf": "fno"}.get(name, name)
     if name == "fno":
         kwargs = {"modes": 12, "width": 32, "pad_frac": 0.0 if periodic else 0.125}
         kwargs.update(overrides)

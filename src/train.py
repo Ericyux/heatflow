@@ -13,7 +13,7 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader
 
-from .data import PDEData, PairDataset, add_coords
+from .data import PDEData, PairDataset, TripletDataset, add_coords
 from .metrics import StepPredictor, one_step_errors, relative_l2
 from .models import build_model, count_params
 from .throttle import pace, set_duty
@@ -48,10 +48,13 @@ def train(args):
     val_frames = data.frames("val")
     pde = data.meta["pde"]
 
+    dataset = TripletDataset(train_frames) if args.pushforward else PairDataset(train_frames)
     loader = DataLoader(
-        PairDataset(train_frames), batch_size=args.batch_size,
+        dataset, batch_size=args.batch_size,
         shuffle=True, num_workers=0, pin_memory=(device.type == "cuda"),
     )
+    # pushforward kicks in after a one-step warmup (Brandstetter et al., 2022)
+    warmup_epochs = max(1, args.epochs // 4) if args.pushforward else args.epochs
 
     model = build_model(args.model, periodic=data.periodic).to(device)
     n_params = count_params(model)
@@ -63,7 +66,8 @@ def train(args):
         optimizer, T_max=args.epochs * len(loader)
     )
 
-    out_dir = RESULTS_DIR / f"{pde}_{args.model}_s{args.seed}"
+    variant = f"{args.model}pf" if args.pushforward else args.model
+    out_dir = RESULTS_DIR / f"{pde}_{variant}_s{args.seed}"
     out_dir.mkdir(parents=True, exist_ok=True)
 
     history = {"train_loss": [], "val_rel_l2": [], "epoch_seconds": []}
@@ -72,14 +76,21 @@ def train(args):
         model.train()
         t0 = time.perf_counter()
         running, seen = 0.0, 0
-        for inputs, targets in loader:
+        for batch in loader:
             t_batch = time.perf_counter()
-            inputs = inputs.to(device, non_blocking=True)
-            targets = targets.to(device, non_blocking=True)
+            batch = [b.to(device, non_blocking=True) for b in batch]
+            inputs, targets = batch[0], batch[1]
             x = add_coords((inputs - mean) / std, data.periodic)
             y = (targets - mean) / std
             pred = model(x)
             loss = relative_l2(pred, y).mean()
+            if args.pushforward and epoch >= warmup_epochs:
+                # second step from the model's own (detached) prediction: the
+                # model learns to correct its own error distribution, without
+                # backprop through time
+                y2 = (batch[2] - mean) / std
+                x2 = add_coords(pred.detach(), data.periodic)
+                loss = 0.5 * (loss + relative_l2(model(x2), y2).mean())
             optimizer.zero_grad(set_to_none=True)
             loss.backward()
             optimizer.step()
@@ -103,6 +114,7 @@ def train(args):
     config = {
         "pde": pde,
         "model": args.model,
+        "pushforward": args.pushforward,
         "data": str(args.data),
         "n_params": n_params,
         "epochs": args.epochs,
@@ -130,6 +142,10 @@ def main():
     parser.add_argument("--gpu-duty", type=float, default=0.6,
                         help="fraction of wall time the GPU is kept busy "
                              "(thermal headroom for laptops; 1.0 = flat out)")
+    parser.add_argument("--pushforward", action="store_true",
+                        help="two-step pushforward training (second step from "
+                             "the model's own detached prediction); run dir "
+                             "gets a 'pf' suffix")
     train(parser.parse_args())
 
 

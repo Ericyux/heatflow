@@ -24,7 +24,7 @@ from .metrics import (StepPredictor, enstrophy_spectrum, one_step_errors,
 from .models import build_model, count_params
 
 RESULTS_DIR = Path("results")
-MODELS = ["fno", "unet", "cnn"]
+MODELS = ["fno", "fnopf", "unet", "cnn"]  # evaluated when trained runs exist
 
 
 def seed_dirs(pde, name):
@@ -130,7 +130,7 @@ def main():
     for name in MODELS:
         runs = seed_dirs(pde, name)
         if not runs:
-            raise FileNotFoundError(f"no trained runs found for {pde}/{name}")
+            continue  # variant not trained for this PDE
 
         one_step, curves, superres = [], [], []
         n_params = None
@@ -224,7 +224,7 @@ def main():
     results["timing_seconds"] = timing
 
     solver_ref = timing[f"solver_{res_gen}_{device.type}"]
-    for name in MODELS:
+    for name in results["models"]:
         roll = timing[f"{name}_rollout_{res_train}_{device.type}"]
         results["models"][name]["speedup_vs_solver"] = solver_ref / roll
 
@@ -232,7 +232,7 @@ def main():
     out_json.write_text(json.dumps(results, indent=2))
     np.savez_compressed(RESULTS_DIR / f"{pde}_fields.npz", **fields)
     print(f"wrote {out_json}")
-    for name in MODELS:
+    for name in results["models"]:
         print(f"  {name}: {results['models'][name]['speedup_vs_solver']:.1f}x faster "
               f"than solver at {res_gen}^2 (per trajectory, {device.type})")
 

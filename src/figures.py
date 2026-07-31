@@ -18,6 +18,7 @@ RESULTS_DIR = Path("results")
 FIG_DIR = RESULTS_DIR / "figures"
 STYLE = {
     "fno": dict(color="#d62728", label="FNO"),
+    "fnopf": dict(color="#9467bd", label="FNO + pushforward"),
     "unet": dict(color="#1f77b4", label="U-Net"),
     "cnn": dict(color="#7f7f7f", label="CNN"),
 }
@@ -88,8 +89,8 @@ def fig_fields(results, pde):
     truth = fields["truth"]
     horizon = truth.shape[0] - 1
     steps = [horizon // 4, horizon // 2, horizon]
-    rows = ["truth", "fno", "unet", "cnn"]
-    row_labels = ["Ground truth", "FNO", "U-Net", "CNN"]
+    rows = ["truth"] + [m for m in STYLE if m in fields]
+    row_labels = ["Ground truth"] + [STYLE[m]["label"] for m in rows[1:]]
 
     cmap = "RdBu_r" if pde == "ns" else "inferno"
 
@@ -130,8 +131,9 @@ def fig_spectrum(results):
     k = np.array(spectra["k"])
     fig, ax = plt.subplots(figsize=(6, 4))
     ax.loglog(k, spectra["truth"], "k-", linewidth=2, label="Ground truth")
-    for name in ("fno", "unet", "cnn"):
-        ax.loglog(k, spectra[name], **STYLE[name])
+    for name in STYLE:
+        if name in spectra:
+            ax.loglog(k, spectra[name], **STYLE[name])
     ax.set_xlabel("wavenumber |k|")
     ax.set_ylabel("enstrophy")
     ax.set_title("Enstrophy spectrum after full rollout — Navier-Stokes")
@@ -156,7 +158,7 @@ def fig_timing(results, pde):
         k = f"solver_{res_train}_cuda"
         if k in timing:
             bars.append((f"solver {res_train}² (GPU)", timing[k], "#999999"))
-    for name in ("fno", "unet", "cnn"):
+    for name in results["models"]:
         k = f"{name}_rollout_{res_train}_cuda"
         if k not in timing:
             k = f"{name}_rollout_{res_train}_cpu"
@@ -182,7 +184,7 @@ def fig_timing(results, pde):
 
 def fig_learning_curves(pde):
     fig, ax = plt.subplots(figsize=(6, 4))
-    for name in ("fno", "unet", "cnn"):
+    for name in STYLE:
         run_dirs = sorted(RESULTS_DIR.glob(f"{pde}_{name}_s*"))
         for i, run_dir in enumerate(run_dirs):
             hist_path = run_dir / "history.json"

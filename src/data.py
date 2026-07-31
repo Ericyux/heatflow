@@ -51,6 +51,23 @@ class PairDataset(Dataset):
         return self.frames[traj, t].unsqueeze(0), self.frames[traj, t + 1].unsqueeze(0)
 
 
+class TripletDataset(Dataset):
+    """Consecutive (u_t, u_{t+1}, u_{t+2}) triplets, for pushforward training."""
+
+    def __init__(self, frames):
+        self.frames = frames
+        self.horizon = frames.shape[1] - 2
+
+    def __len__(self):
+        return self.frames.shape[0] * self.horizon
+
+    def __getitem__(self, idx):
+        traj, t = divmod(idx, self.horizon)
+        return (self.frames[traj, t].unsqueeze(0),
+                self.frames[traj, t + 1].unsqueeze(0),
+                self.frames[traj, t + 2].unsqueeze(0))
+
+
 class PDEData:
     """Loads a generated .npz dataset and exposes splits and metadata."""
 
