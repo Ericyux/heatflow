@@ -1,0 +1,13 @@
+{
+  "pde": "ns",
+  "model": "cnn",
+  "data": "data/ns.npz",
+  "n_params": 2348113,
+  "epochs": 40,
+  "batch_size": 32,
+  "lr": 0.001,
+  "seed": 2,
+  "norm_mean": 5.881031839294337e-08,
+  "norm_std": 0.8008480668067932,
+  "best_val_rel_l2": 0.021475093439221382
+}

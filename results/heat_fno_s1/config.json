@@ -1,0 +1,13 @@
+{
+  "pde": "heat",
+  "model": "fno",
+  "data": "data/heat.npz",
+  "n_params": 2368001,
+  "epochs": 30,
+  "batch_size": 32,
+  "lr": 0.001,
+  "seed": 1,
+  "norm_mean": 0.13636937737464905,
+  "norm_std": 0.17685489356517792,
+  "best_val_rel_l2": 0.0008022614056244493
+}
